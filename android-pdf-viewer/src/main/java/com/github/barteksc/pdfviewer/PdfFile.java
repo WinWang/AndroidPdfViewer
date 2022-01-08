@@ -29,7 +29,9 @@ import com.shockwave.pdfium.util.Size;
 import com.shockwave.pdfium.util.SizeF;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 class PdfFile {
 
@@ -37,33 +39,60 @@ class PdfFile {
     private PdfDocument pdfDocument;
     private PdfiumCore pdfiumCore;
     private int pagesCount = 0;
-    /** Original page sizes */
+    /**
+     * Original page sizes
+     */
     private List<Size> originalPageSizes = new ArrayList<>();
-    /** Scaled page sizes */
+    /**
+     * Scaled page sizes
+     */
     private List<SizeF> pageSizes = new ArrayList<>();
-    /** Opened pages with indicator whether opening was successful */
+    /**
+     * Opened pages with indicator whether opening was successful
+     */
     private SparseBooleanArray openedPages = new SparseBooleanArray();
-    /** Page with maximum width */
+    /**
+     * Page with maximum width
+     */
     private Size originalMaxWidthPageSize = new Size(0, 0);
-    /** Page with maximum height */
+    /**
+     * Page with maximum height
+     */
     private Size originalMaxHeightPageSize = new Size(0, 0);
-    /** Scaled page with maximum height */
+    /**
+     * Scaled page with maximum height
+     */
     private SizeF maxHeightPageSize = new SizeF(0, 0);
-    /** Scaled page with maximum width */
+    /**
+     * Scaled page with maximum width
+     */
     private SizeF maxWidthPageSize = new SizeF(0, 0);
-    /** True if scrolling is vertical, else it's horizontal */
+    /**
+     * True if scrolling is vertical, else it's horizontal
+     */
     private boolean isVertical;
-    /** Fixed spacing between pages in pixels */
+    /**
+     * Fixed spacing between pages in pixels
+     */
     private int spacingPx;
-    /** Calculate spacing automatically so each page fits on it's own in the center of the view */
+    /**
+     * Calculate spacing automatically so each page fits on it's own in the center of the view
+     */
     private boolean autoSpacing;
-    /** Calculated offsets for pages */
+    /**
+     * Calculated offsets for pages
+     */
     private List<Float> pageOffsets = new ArrayList<>();
-    /** Calculated auto spacing for pages */
+    /**
+     * Calculated auto spacing for pages
+     */
     private List<Float> pageSpacing = new ArrayList<>();
-    /** Calculated document length (width or height, depending on swipe mode) */
+    /**
+     * Calculated document length (width or height, depending on swipe mode)
+     */
     private float documentLength = 0;
     private final FitPolicy pageFitPolicy;
+    public static int MAX_PAGES = 10;
     /**
      * True if every page should fit separately according to the FitPolicy,
      * else the largest page fits and other pages scale relatively
@@ -75,6 +104,8 @@ class PdfFile {
      */
     private int[] originalUserPages;
 
+    Queue<Integer> OpenedPageQueue;
+
     PdfFile(PdfiumCore pdfiumCore, PdfDocument pdfDocument, FitPolicy pageFitPolicy, Size viewSize, int[] originalUserPages,
             boolean isVertical, int spacing, boolean autoSpacing, boolean fitEachPage) {
         this.pdfiumCore = pdfiumCore;
@@ -85,6 +116,7 @@ class PdfFile {
         this.spacingPx = spacing;
         this.autoSpacing = autoSpacing;
         this.fitEachPage = fitEachPage;
+        this.OpenedPageQueue = new LinkedList();
         setup(viewSize);
     }
 
@@ -231,7 +263,9 @@ class PdfFile {
         return spacing * zoom;
     }
 
-    /** Get primary page offset, that is Y for vertical scroll and X for horizontal scroll */
+    /**
+     * Get primary page offset, that is Y for vertical scroll and X for horizontal scroll
+     */
     public float getPageOffset(int pageIndex, float zoom) {
         int docPage = documentPage(pageIndex);
         if (docPage < 0) {
@@ -240,7 +274,9 @@ class PdfFile {
         return pageOffsets.get(pageIndex) * zoom;
     }
 
-    /** Get secondary page offset, that is X for vertical scroll and Y for horizontal scroll */
+    /**
+     * Get secondary page offset, that is X for vertical scroll and Y for horizontal scroll
+     */
     public float getSecondaryPageOffset(int pageIndex, float zoom) {
         SizeF pageSize = getPageSize(pageIndex);
         if (isVertical) {
@@ -275,6 +311,17 @@ class PdfFile {
                 try {
                     pdfiumCore.openPage(pdfDocument, docPage);
                     openedPages.put(docPage, true);
+
+                    // Memory management
+                    OpenedPageQueue.add(pageIndex);
+                    if (OpenedPageQueue != null) {
+                        if (OpenedPageQueue.size() > MAX_PAGES) {
+                            int oldPage = OpenedPageQueue.poll();
+                            pdfiumCore.closePage(this.pdfDocument, oldPage);
+                            openedPages.delete(oldPage);
+                        }
+                    }
+
                     return true;
                 } catch (Exception e) {
                     openedPages.put(docPage, false);
