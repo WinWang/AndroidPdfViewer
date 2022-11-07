@@ -1,4 +1,10 @@
 
+# 该项目是基于开源项目AndroidPdfViewer拉的分支修复官方加载200多页PDF会内存OOM的问题
+
+##使用：将依赖替换成我发布的依赖即可
+  implementaion "com.github.WinWang:AndroidPdfViewer:3.1.5"
+
+
 # Looking for new maintainer!
 
 
